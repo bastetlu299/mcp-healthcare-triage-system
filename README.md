@@ -2,6 +2,16 @@
 
 A comprehensive multi-agent architecture built on Model Context Protocol (MCP) and A2A (Agent-to-Agent) communication. This system coordinates specialized agents (Patient Data, Triage, Insurance) through a Router agent to handle healthcare triage scenarios.
 
+## Purpose and Business Sense
+
+This project models a healthcare triage workflow where incoming patient requests are screened, enriched with clinical context, and routed to the right specialist response. The objective is to improve intake efficiency while ensuring patients receive timely, consistent guidance aligned with their symptoms and coverage questions.
+
+**Why this matters for healthcare operations:**
+- **Faster intake decisions**: the Router and Triage agents help categorize urgency and provide first-pass guidance without manual handoffs.
+- **Single source of data**: the Patient Data agent surfaces chart and encounter history so responses are grounded in context.
+- **Coverage clarity**: the Insurance agent answers benefits and copay questions that often block care decisions.
+- **Scalable coordination**: agents are independently deployable, allowing clinics to scale triage and coverage workflows as demand grows.
+
 ## Architecture Overview
 
 ```
