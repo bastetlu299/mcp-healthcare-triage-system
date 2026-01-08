@@ -1,7 +1,7 @@
 """
 Router Agent
 ------------
-Coordinates between specialist A2A agents (data, support, payment) using a
+Coordinates between specialist A2A agents (data, triage, insurance) using a
 LangGraph workflow. The router interprets user intent, forwards the request to
 the appropriate agent(s), and aggregates the returned information.
 """
@@ -32,8 +32,8 @@ from shared.message_utils import build_text_message
 # ---------------------------------------------------------------------------
 
 DATA_RPC = os.getenv("DATA_AGENT_RPC", "http://localhost:8011/rpc")
-SUPPORT_RPC = os.getenv("SUPPORT_AGENT_RPC", "http://localhost:8012/rpc")
-PAYMENT_RPC = os.getenv("BILLING_AGENT_RPC", "http://localhost:8013/rpc")  # renamed folder OK
+TRIAGE_RPC = os.getenv("TRIAGE_AGENT_RPC", "http://localhost:8012/rpc")
+INSURANCE_RPC = os.getenv("INSURANCE_AGENT_RPC", "http://localhost:8013/rpc")
 
 
 # ---------------------------------------------------------------------------
@@ -96,12 +96,12 @@ def create_router_graph():
     def classify_intent(state: RouterState) -> RouterState:
         query = state["messages"][-1].lower()
 
-        if any(word in query for word in ["billing", "refund", "payment"]):
-            state["route"] = "payment"
-        elif any(word in query for word in ["customer", "history"]):
-            state["route"] = "data_then_support"
+        if any(word in query for word in ["insurance", "coverage", "billing", "copay"]):
+            state["route"] = "insurance"
+        elif any(word in query for word in ["patient", "history", "chart"]):
+            state["route"] = "data_then_triage"
         else:
-            state["route"] = "support"
+            state["route"] = "triage"
 
         return state
 
@@ -110,19 +110,19 @@ def create_router_graph():
         user_text = state["messages"][-1]
         collected: List[str] = []
 
-        if state["route"] == "data_then_support":
+        if state["route"] == "data_then_triage":
             data_reply = await call_agent_over_rpc(DATA_RPC, user_text)
             combined_prompt = f"Data context: {data_reply}. Provide guidance to the user."
-            support_reply = await call_agent_over_rpc(SUPPORT_RPC, combined_prompt)
-            collected.extend([data_reply, support_reply])
+            triage_reply = await call_agent_over_rpc(TRIAGE_RPC, combined_prompt)
+            collected.extend([data_reply, triage_reply])
 
-        elif state["route"] == "payment":
-            payment_reply = await call_agent_over_rpc(PAYMENT_RPC, user_text)
-            collected.append(payment_reply)
+        elif state["route"] == "insurance":
+            insurance_reply = await call_agent_over_rpc(INSURANCE_RPC, user_text)
+            collected.append(insurance_reply)
 
-        else:  # fallback to support
-            support_reply = await call_agent_over_rpc(SUPPORT_RPC, user_text)
-            collected.append(support_reply)
+        else:  # fallback to triage
+            triage_reply = await call_agent_over_rpc(TRIAGE_RPC, user_text)
+            collected.append(triage_reply)
 
         state["results"] = collected
         return state
@@ -157,7 +157,7 @@ async def router_skill(message: Message) -> Message:
     initial_text = message.parts[0].text if (message.parts and message.parts[0].text) else ""
     starting_state: RouterState = {
         "messages": [initial_text],
-        "route": "support",
+        "route": "triage",
         "results": [],
     }
 
@@ -188,14 +188,14 @@ def create_agent_card() -> AgentCard:
             AgentSkill(
                 id="router",
                 name="Request Routing",
-                description="Dispatches tasks to data, support, and payment agents.",
+                description="Dispatches tasks to data, triage, and insurance agents.",
                 tags=["router", "workflow", "langgraph"],
                 inputModes=["text"],
                 outputModes=["text"],
                 examples=[
                     "Get history and provide a final response",
-                    "Handle a billing question",
-                    "General support request",
+                    "Handle an insurance coverage question",
+                    "General triage request",
                 ],
             )
         ],

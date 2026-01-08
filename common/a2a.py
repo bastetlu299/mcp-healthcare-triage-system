@@ -7,7 +7,7 @@ It defines:
   - SimpleAgentRequestHandler: in-memory task + message management
   - register_agent_routes: attaches JSON-RPC endpoints to a FastAPI app
 
-Every agent (router, data, support, payment) loads this file to expose
+Every agent (router, data, triage, insurance) loads this file to expose
 a standard RPC surface compliant with the A2A protocol used in Assignment 5.
 """
 

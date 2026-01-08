@@ -1,9 +1,9 @@
 """
-Customer Data Agent
--------------------
+Patient Data Agent
+------------------
 This agent acts as a thin client over the MCP server. It exposes a single skill
-that allows other agents (e.g., router or support) to request customer records,
-lists, and interaction history via A2A.
+that allows other agents (e.g., router or triage) to request patient records,
+lists, and encounter history via A2A.
 """
 
 import os
@@ -57,16 +57,16 @@ async def handle_data_request(message: Message) -> Message:
 
     # simple rule-based routing for demo purposes
     if "list" in lowered:
-        data = await invoke_mcp("list_customers", {"limit": 5})
-        reply = f"Customer list (limit 5): {data}"
+        data = await invoke_mcp("list_patients", {"limit": 5})
+        reply = f"Patient list (limit 5): {data}"
 
     elif "history" in lowered:
-        data = await invoke_mcp("get_customer_history", {"customer_id": 1})
-        reply = f"Interaction history for customer 1: {data}"
+        data = await invoke_mcp("get_patient_history", {"patient_id": 1})
+        reply = f"Encounter history for patient 1: {data}"
 
     else:
-        data = await invoke_mcp("get_customer", {"customer_id": 1})
-        reply = f"Customer record: {data}"
+        data = await invoke_mcp("get_patient", {"patient_id": 1})
+        reply = f"Patient record: {data}"
 
     return build_text_message(reply)
 
@@ -77,11 +77,11 @@ async def handle_data_request(message: Message) -> Message:
 
 def build_agent_card() -> AgentCard:
     return AgentCard(
-        name="Customer Data Agent",
-        description="Fetches customer records, lists, and history via MCP calls.",
+        name="Patient Data Agent",
+        description="Fetches patient records, lists, and history via MCP calls.",
         version="1.0.0",
         url="http://localhost:8011",
-        documentationUrl="https://example.com/docs/customer-data",
+        documentationUrl="https://example.com/docs/patient-data",
         capabilities=AgentCapabilities(streaming=True),
         defaultInputModes=["text"],
         defaultOutputModes=["text"],
@@ -91,16 +91,16 @@ def build_agent_card() -> AgentCard:
         ),
         skills=[
             AgentSkill(
-                id="customer-data",
-                name="Customer Data Tools",
-                description="Uses MCP to retrieve customer information.",
+                id="patient-data",
+                name="Patient Data Tools",
+                description="Uses MCP to retrieve patient information.",
                 tags=["mcp", "data"],
                 inputModes=["text"],
                 outputModes=["text"],
                 examples=[
-                    "List customers",
-                    "Show me history for a customer",
-                    "Get customer details",
+                    "List patients",
+                    "Show me history for a patient",
+                    "Get patient details",
                 ],
             )
         ],
@@ -113,9 +113,9 @@ def build_agent_card() -> AgentCard:
 # ---------------------------------------------------------------------------
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Customer Data Agent Service")
+    app = FastAPI(title="Patient Data Agent Service")
     handler = SimpleAgentRequestHandler(
-        agent_id="customer-data",
+        agent_id="patient-data",
         skill_callback=handle_data_request,
     )
     register_agent_routes(app, build_agent_card(), handler)

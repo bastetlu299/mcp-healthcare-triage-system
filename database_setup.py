@@ -6,9 +6,9 @@ from typing import Iterable, Tuple
 
 
 class DatabaseSetup:
-    """Helper to initialize the Assignment 5 SQLite database."""
+    """Helper to initialize the healthcare triage SQLite database."""
 
-    def __init__(self, db_path: Path | str = "support.db") -> None:
+    def __init__(self, db_path: Path | str = "triage.db") -> None:
         self.db_path = Path(db_path)
 
     def initialize(self) -> None:
@@ -18,61 +18,61 @@ class DatabaseSetup:
             conn.execute("PRAGMA foreign_keys = ON")
             conn.executescript(
                 """
-                CREATE TABLE IF NOT EXISTS customers (
+                CREATE TABLE IF NOT EXISTS patients (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
-                    email TEXT NOT NULL,
+                    date_of_birth TEXT NOT NULL,
                     status TEXT NOT NULL,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
 
-                CREATE TABLE IF NOT EXISTS tickets (
+                CREATE TABLE IF NOT EXISTS cases (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    customer_id INTEGER NOT NULL,
-                    issue TEXT NOT NULL,
-                    priority TEXT NOT NULL,
+                    patient_id INTEGER NOT NULL,
+                    complaint TEXT NOT NULL,
+                    urgency TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'open',
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY(customer_id) REFERENCES customers(id)
+                    FOREIGN KEY(patient_id) REFERENCES patients(id)
                 );
 
-                CREATE TABLE IF NOT EXISTS interactions (
+                CREATE TABLE IF NOT EXISTS encounters (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    customer_id INTEGER NOT NULL,
+                    patient_id INTEGER NOT NULL,
                     channel TEXT NOT NULL,
                     notes TEXT NOT NULL,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY(customer_id) REFERENCES customers(id)
+                    FOREIGN KEY(patient_id) REFERENCES patients(id)
                 );
                 """
             )
             conn.commit()
 
-            cursor = conn.execute("SELECT COUNT(*) FROM customers")
+            cursor = conn.execute("SELECT COUNT(*) FROM patients")
             count = cursor.fetchone()[0]
             if count == 0:
-                customers: Iterable[Tuple[str, str, str]] = [
-                    ("Ana Customer", "ana@example.com", "active"),
-                    ("Brian Blocked", "brian@example.com", "delinquent"),
-                    ("Cara Care", "cara@example.com", "vip"),
+                patients: Iterable[Tuple[str, str, str]] = [
+                    ("Ana Rivera", "1987-05-14", "stable"),
+                    ("Brian Lee", "1974-11-02", "monitoring"),
+                    ("Cara Singh", "1992-08-30", "urgent"),
                 ]
-                interactions: Iterable[Tuple[int, str, str]] = [
-                    (1, "email", "Welcome email sent"),
-                    (1, "phone", "Reported login issue"),
-                    (2, "chat", "Billing dispute opened"),
-                    (3, "email", "Requested feature roadmap"),
+                encounters: Iterable[Tuple[int, str, str]] = [
+                    (1, "phone", "Reported dizziness and mild headache"),
+                    (1, "chat", "Shared blood pressure readings"),
+                    (2, "phone", "Medication refill request"),
+                    (3, "email", "Reported chest tightness after exercise"),
                 ]
                 conn.executemany(
-                    "INSERT INTO customers(name, email, status) VALUES(?,?,?)",
-                    customers,
+                    "INSERT INTO patients(name, date_of_birth, status) VALUES(?,?,?)",
+                    patients,
                 )
                 conn.executemany(
-                    "INSERT INTO interactions(customer_id, channel, notes) VALUES(?,?,?)",
-                    interactions,
+                    "INSERT INTO encounters(patient_id, channel, notes) VALUES(?,?,?)",
+                    encounters,
                 )
                 conn.commit()
 
 
 if __name__ == "__main__":
     DatabaseSetup().initialize()
-    print("Database initialized at support.db")
+    print("Database initialized at triage.db")
