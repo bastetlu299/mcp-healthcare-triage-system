@@ -1,7 +1,7 @@
 """
-Payment / Billing Agent
------------------------
-Handles queries related to invoices, refunds, and general payment issues.
+Insurance Agent
+---------------
+Handles queries related to coverage, copays, and benefits eligibility.
 This agent does not call MCP tools directly; instead, it provides domain-
 specific responses to upstream agents such as the router.
 """
@@ -23,14 +23,14 @@ from shared.message_utils import build_text_message
 # Skill implementation
 # ---------------------------------------------------------------------------
 
-async def payment_skill(message: Message) -> Message:
+async def insurance_skill(message: Message) -> Message:
     """
-    Produce a text-based response summarizing billing capabilities.
+    Produce a text-based response summarizing insurance capabilities.
     """
     user_text = message.parts[0].text if (message.parts and message.parts[0].text) else ""
     reply = (
-        "Payment Agent Response:\n"
-        "I handle refunds, invoice issues, failed payments, and account charges.\n"
+        "Insurance Agent Response:\n"
+        "I handle coverage checks, copay explanations, and benefits questions.\n"
         f"Your request: {user_text}"
     )
     return build_text_message(reply)
@@ -42,11 +42,11 @@ async def payment_skill(message: Message) -> Message:
 
 def create_agent_card() -> AgentCard:
     return AgentCard(
-        name="Payment Agent",
-        description="Provides assistance for payment, invoices, and refund inquiries.",
+        name="Insurance Agent",
+        description="Provides assistance for insurance coverage and benefits inquiries.",
         version="1.0.0",
         url="http://localhost:8013",
-        documentationUrl="https://example.com/docs/payments",
+        documentationUrl="https://example.com/docs/insurance",
         defaultInputModes=["text"],
         defaultOutputModes=["text"],
         capabilities=AgentCapabilities(streaming=True),
@@ -56,13 +56,13 @@ def create_agent_card() -> AgentCard:
         ),
         skills=[
             AgentSkill(
-                id="payment",
-                name="Payment Services",
-                description="Supports billing problems and refund workflows.",
-                tags=["billing", "payments"],
+                id="insurance",
+                name="Insurance Services",
+                description="Supports coverage questions and copay guidance.",
+                tags=["insurance", "benefits"],
                 inputModes=["text"],
                 outputModes=["text"],
-                examples=["Issue refund", "Send invoice", "Payment failed"],
+                examples=["Check coverage for labs", "What is my copay?", "Explain benefits"],
             )
         ],
         preferredTransport="JSONRPC",
@@ -74,10 +74,10 @@ def create_agent_card() -> AgentCard:
 # ---------------------------------------------------------------------------
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Payment Agent Service")
+    app = FastAPI(title="Insurance Agent Service")
     handler = SimpleAgentRequestHandler(
-        agent_id="payment",
-        skill_callback=payment_skill,
+        agent_id="insurance",
+        skill_callback=insurance_skill,
     )
     register_agent_routes(app, create_agent_card(), handler)
     return app

@@ -1,6 +1,6 @@
-# MCP Multi-Agent System
+# MCP Healthcare Triage System
 
-A comprehensive multi-agent architecture built on Model Context Protocol (MCP) and A2A (Agent-to-Agent) communication. This system coordinates specialized agents (Data, Support, Payment) through a Router agent to handle customer support scenarios.
+A comprehensive multi-agent architecture built on Model Context Protocol (MCP) and A2A (Agent-to-Agent) communication. This system coordinates specialized agents (Patient Data, Triage, Insurance) through a Router agent to handle healthcare triage scenarios.
 
 ## Architecture Overview
 
@@ -15,7 +15,7 @@ A comprehensive multi-agent architecture built on Model Context Protocol (MCP) a
         │                   │                   │
         ▼                   ▼                   ▼
 ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│ Data Agent   │    │Support Agent │    │Payment Agent │
+│ Data Agent   │    │Triage Agent  │    │Insurance Agent │
 │ (Port 8011)  │    │ (Port 8012)  │    │ (Port 8013)  │
 └──────────────┘    └──────────────┘    └──────────────┘
         ▲                   ▲                   ▲
@@ -62,10 +62,10 @@ A comprehensive multi-agent architecture built on Model Context Protocol (MCP) a
     ├── data/                     # Data Agent (Port 8011)
     │   ├── main.py              # MCP client for records
     │   └── __init__.py
-    ├── support/                  # Support Agent (Port 8012)
+    ├── support/                  # Triage Agent (Port 8012)
     │   ├── main.py              # Customer guidance
     │   └── __init__.py
-    ├── payments/                 # Payment Agent (Port 8013)
+    ├── payments/                 # Insurance Agent (Port 8013)
     │   ├── main.py              # Billing responses
     │   └── __init__.py
     └── __init__.py
@@ -120,7 +120,7 @@ pip install -r requirements.txt
 python database_setup.py
 ```
 
-Creates `support.db` with sample customers and interactions.
+Creates `triage.db` with sample patients and encounters.
 
 ### 5. Start All Services
 
@@ -136,13 +136,13 @@ python -m agents.data.main
 # Listens on http://localhost:8011
 ```
 
-**Terminal 3 — Support Agent:**
+**Terminal 3 — Triage Agent:**
 ```bash
 python -m agents.support.main
 # Listens on http://localhost:8012
 ```
 
-**Terminal 4 — Payment Agent:**
+**Terminal 4 — Insurance Agent:**
 ```bash
 python -m agents.payments.main
 # Listens on http://localhost:8013
@@ -176,15 +176,15 @@ Create a `.env` file in the project root:
 
 ```bash
 # Database path (default: ./database.sqlite)
-A2A_DB_PATH=./database.sqlite
+A2A_DB_PATH=./triage.db
 
 # MCP Server URL (for agents to reach it)
 MCP_SERVER_URL=http://localhost:8000
 
 # Agent RPC endpoints (used by router)
 DATA_AGENT_RPC=http://localhost:8011/rpc
-SUPPORT_AGENT_RPC=http://localhost:8012/rpc
-BILLING_AGENT_RPC=http://localhost:8013/rpc
+TRIAGE_AGENT_RPC=http://localhost:8012/rpc
+INSURANCE_AGENT_RPC=http://localhost:8013/rpc
 
 # Router endpoint (used by clients)
 ROUTER_RPC=http://localhost:8010/rpc
@@ -207,11 +207,11 @@ export $(cat .env | xargs)
 | `/health` | GET | Health check |
 
 **Available Tools:**
-- `get_customer` — Fetch customer record by ID
-- `list_customers` — List customers (optionally filtered by status)
-- `update_customer` — Modify customer fields
-- `create_ticket` — Open a support ticket
-- `get_customer_history` — Retrieve interaction history
+- `get_patient` — Fetch patient record by ID
+- `list_patients` — List patients (optionally filtered by status)
+- `update_patient` — Modify patient fields
+- `create_case` — Open a triage case
+- `get_patient_history` — Retrieve encounter history
 
 ### A2A Agent RPC Methods
 
@@ -259,7 +259,7 @@ from sdk.types import Message, MessageSendParams, Role
 from common.message_utils import create_text_message
 
 async def query_router():
-    msg = create_text_message("Get customer information for ID 5", role=Role.user)
+    msg = create_text_message("Get patient information for ID 5", role=Role.user)
     params = {"message": msg.model_dump()}
     
     async with httpx.AsyncClient() as client:
@@ -282,17 +282,17 @@ asyncio.run(query_router())
 ### 2. Multi-Intent Scenario
 
 ```python
-query = "Update my email to newemail@example.com and show my ticket history"
-# Router automatically routes to both Data and Support agents
+query = "Update my date of birth to 1980-12-01 and show my encounter history"
+# Router automatically routes to both Data and Triage agents
 # Combines responses into a single coherent answer
 ```
 
 ### 3. Escalation Flow
 
 ```python
-query = "I've been charged twice, please refund immediately!"
-# Router detects billing keywords → routes to Payment agent
-# Payment agent provides specialized response
+query = "Do I need a referral and what is my copay?"
+# Router detects coverage keywords → routes to Insurance agent
+# Insurance agent provides specialized response
 ```
 
 ## Workflow: Request Flow
@@ -307,40 +307,40 @@ query = "I've been charged twice, please refund immediately!"
 
 | Query Keywords | Route | Agents |
 |---|---|---|
-| `billing`, `refund`, `payment` | Payment | Payment Agent |
-| `customer`, `history` | Data then Support | Data Agent → Support Agent |
-| Default | Support | Support Agent |
+| `insurance`, `coverage`, `copay` | Insurance | Insurance Agent |
+| `patient`, `history`, `chart` | Data then Triage | Data Agent → Triage Agent |
+| Default | Triage | Triage Agent |
 
 ## Database Schema
 
-### customers
+### patients
 ```sql
-CREATE TABLE customers (
+CREATE TABLE patients (
   id INTEGER PRIMARY KEY,
   name TEXT,
-  email TEXT,
-  status TEXT,  -- 'active', 'delinquent', 'vip'
+  date_of_birth TEXT,
+  status TEXT,  -- 'stable', 'monitoring', 'urgent'
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-### tickets
+### cases
 ```sql
-CREATE TABLE tickets (
+CREATE TABLE cases (
   id INTEGER PRIMARY KEY,
-  customer_id INTEGER,
-  issue TEXT,
-  priority TEXT,
+  patient_id INTEGER,
+  complaint TEXT,
+  urgency TEXT,
   status TEXT DEFAULT 'open',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-### interactions
+### encounters
 ```sql
-CREATE TABLE interactions (
+CREATE TABLE encounters (
   id INTEGER PRIMARY KEY,
-  customer_id INTEGER,
+  patient_id INTEGER,
   channel TEXT,  -- 'email', 'phone', 'chat'
   notes TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -366,7 +366,7 @@ lsof -i :8010 | grep LISTEN | awk '{print $2}' | xargs kill -9
 ### Database Lock
 ```bash
 # Remove stale database
-rm -f support.db database.sqlite
+rm -f triage.db database.sqlite
 python database_setup.py
 ```
 
@@ -407,7 +407,7 @@ python demo.py
 ```
 
 This tests:
-- Simple customer lookups
+- Simple patient lookups
 - Multi-agent coordination
 - Complex search queries
 - Escalation workflows

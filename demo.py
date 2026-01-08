@@ -28,11 +28,11 @@ def print_response(prompt: str, result: dict | None) -> None:
 
 async def main():
     prompts = [
-        "Customer 1 billing summary and next payment guidance",
-        "Customer 2 has login problems, what should support do?",
-        "Customer history then support guidance",
-        "Open a new high-priority ticket for customer 3 about shipment delay",
-        "List recent active customers and suggest a follow-up action",
+        "Patient 1 coverage summary and copay guidance",
+        "Patient 2 has a fever and cough, what should triage do?",
+        "Patient history then triage guidance",
+        "Open a new urgent case for patient 3 about chest tightness",
+        "List recent urgent patients and suggest a follow-up action",
     ]
 
     async with httpx.AsyncClient() as client:

@@ -1,5 +1,5 @@
 # ============================================================================
-#  Minimal MCP-Compatible Server for Assignment 5
+#  Minimal MCP-Compatible Server for Healthcare Triage
 #  Rewritten version for clarity, maintainability, and uniqueness
 # ============================================================================
 
@@ -12,10 +12,10 @@ from sse_starlette.sse import EventSourceResponse
 
 # database access layer (unchanged API)
 from mcp_server.database import (
-    fetch_customer,
-    fetch_customers,
-    update_customer_record,
-    create_ticket_record,
+    fetch_patient,
+    fetch_patients,
+    update_patient_record,
+    create_case_record,
     fetch_history,
 )
 
@@ -24,7 +24,7 @@ from mcp_server.database import (
 # ----------------------------------------------------------------------------
 
 app = FastAPI(
-    title="Assignment 5 MCP Server (Rewritten)",
+    title="Healthcare Triage MCP Server",
     version="1.0.0"
 )
 
@@ -50,17 +50,17 @@ class ToolInvocation(BaseModel):
 
 TOOL_REGISTRY: List[Dict[str, Any]] = [
     {
-        "name": "get_customer",
-        "description": "Retrieve a single customer using its ID.",
+        "name": "get_patient",
+        "description": "Retrieve a single patient using their ID.",
         "input_schema": {
             "type": "object",
-            "properties": {"customer_id": {"type": "integer"}},
-            "required": ["customer_id"],
+            "properties": {"patient_id": {"type": "integer"}},
+            "required": ["patient_id"],
         },
     },
     {
-        "name": "list_customers",
-        "description": "Return a list of customers, optionally filtered by status.",
+        "name": "list_patients",
+        "description": "Return a list of patients, optionally filtered by status.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -70,37 +70,37 @@ TOOL_REGISTRY: List[Dict[str, Any]] = [
         },
     },
     {
-        "name": "update_customer",
-        "description": "Modify customer fields such as name, email, or status.",
+        "name": "update_patient",
+        "description": "Modify patient fields such as name, date of birth, or status.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "customer_id": {"type": "integer"},
+                "patient_id": {"type": "integer"},
                 "data": {"type": "object"},
             },
-            "required": ["customer_id", "data"],
+            "required": ["patient_id", "data"],
         },
     },
     {
-        "name": "create_ticket",
-        "description": "Open a new support ticket for a customer.",
+        "name": "create_case",
+        "description": "Open a new triage case for a patient.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "customer_id": {"type": "integer"},
-                "issue": {"type": "string"},
-                "priority": {"type": "string"},
+                "patient_id": {"type": "integer"},
+                "complaint": {"type": "string"},
+                "urgency": {"type": "string"},
             },
-            "required": ["customer_id", "issue", "priority"],
+            "required": ["patient_id", "complaint", "urgency"],
         },
     },
     {
-        "name": "get_customer_history",
-        "description": "Retrieve the interaction history for a customer.",
+        "name": "get_patient_history",
+        "description": "Retrieve the encounter history for a patient.",
         "input_schema": {
             "type": "object",
-            "properties": {"customer_id": {"type": "integer"}},
-            "required": ["customer_id"],
+            "properties": {"patient_id": {"type": "integer"}},
+            "required": ["patient_id"],
         },
     },
 ]
@@ -142,27 +142,27 @@ async def call_tool(request: ToolInvocation) -> Dict[str, Any]:
     tool = request.name
     args = request.arguments
 
-    # --- get_customer ---------------------------------------------------------
-    if tool == "get_customer":
-        customer_id = int(args.get("customer_id"))
-        customer = await asyncio.to_thread(fetch_customer, customer_id)
+    # --- get_patient ---------------------------------------------------------
+    if tool == "get_patient":
+        patient_id = int(args.get("patient_id"))
+        patient = await asyncio.to_thread(fetch_patient, patient_id)
 
-        if not customer:
-            http_not_found("Customer does not exist")
+        if not patient:
+            http_not_found("Patient does not exist")
 
         await enqueue_event({
             "type": "audit",
             "tool": tool,
-            "customer_id": customer["id"]
+            "patient_id": patient["id"]
         })
-        return {"result": customer}
+        return {"result": patient}
 
-    # --- list_customers -------------------------------------------------------
-    if tool == "list_customers":
+    # --- list_patients -------------------------------------------------------
+    if tool == "list_patients":
         status = args.get("status")
         limit = int(args.get("limit", 20))
 
-        records = await asyncio.to_thread(fetch_customers, status, limit)
+        records = await asyncio.to_thread(fetch_patients, status, limit)
 
         await enqueue_event({
             "type": "audit",
@@ -171,42 +171,42 @@ async def call_tool(request: ToolInvocation) -> Dict[str, Any]:
         })
         return {"result": records}
 
-    # --- update_customer ------------------------------------------------------
-    if tool == "update_customer":
-        cid = int(args.get("customer_id"))
+    # --- update_patient ------------------------------------------------------
+    if tool == "update_patient":
+        pid = int(args.get("patient_id"))
         patch = args.get("data") or {}
 
-        updated = await asyncio.to_thread(update_customer_record, cid, patch)
+        updated = await asyncio.to_thread(update_patient_record, pid, patch)
 
         if not updated:
-            http_not_found("Customer not found for update")
+            http_not_found("Patient not found for update")
 
         await enqueue_event({
             "type": "update",
             "tool": tool,
-            "customer_id": updated["id"]
+            "patient_id": updated["id"]
         })
         return {"result": updated}
 
-    # --- create_ticket --------------------------------------------------------
-    if tool == "create_ticket":
-        cid = int(args.get("customer_id"))
-        issue = str(args.get("issue"))
-        priority = str(args.get("priority"))
+    # --- create_case --------------------------------------------------------
+    if tool == "create_case":
+        pid = int(args.get("patient_id"))
+        complaint = str(args.get("complaint"))
+        urgency = str(args.get("urgency"))
 
-        ticket = await asyncio.to_thread(create_ticket_record, cid, issue, priority)
+        case = await asyncio.to_thread(create_case_record, pid, complaint, urgency)
 
         await enqueue_event({
-            "type": "ticket",
+            "type": "case",
             "tool": tool,
-            "ticket_id": ticket["id"]
+            "case_id": case["id"]
         })
-        return {"result": ticket}
+        return {"result": case}
 
-    # --- get_customer_history -------------------------------------------------
-    if tool == "get_customer_history":
-        cid = int(args.get("customer_id"))
-        history = await asyncio.to_thread(fetch_history, cid)
+    # --- get_patient_history -------------------------------------------------
+    if tool == "get_patient_history":
+        pid = int(args.get("patient_id"))
+        history = await asyncio.to_thread(fetch_history, pid)
 
         await enqueue_event({
             "type": "history",

@@ -2,8 +2,8 @@
 Database interface layer used by the MCP server and A2A agents.
 
 This module centralizes all data reads/writes to the SQLite database,
-providing a clean API for the MCP tool handlers to interact with customers,
-tickets, and interaction history.
+providing a clean API for the MCP tool handlers to interact with patients,
+cases, and encounter history.
 """
 
 from __future__ import annotations
@@ -38,32 +38,32 @@ def _open_db() -> sqlite3.Connection:
 #  Query Functions
 # -----------------------------------------------------------------------------
 
-def get_customer(customer_id: int) -> Optional[Dict[str, Any]]:
+def get_patient(patient_id: int) -> Optional[Dict[str, Any]]:
     """
-    Fetch a single customer record by ID.
+    Fetch a single patient record by ID.
     """
     with _open_db() as db:
         row = db.execute(
             """
-            SELECT id, name, email, status, created_at
-            FROM customers
+            SELECT id, name, date_of_birth, status, created_at
+            FROM patients
             WHERE id = ?
             """,
-            (customer_id,),
+            (patient_id,),
         ).fetchone()
         return dict(row) if row else None
 
 
-def list_customers(status: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
+def list_patients(status: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
     """
-    Retrieve multiple customers, optionally filtered by status.
+    Retrieve multiple patients, optionally filtered by status.
     """
     with _open_db() as db:
         if status:
             rows = db.execute(
                 """
-                SELECT id, name, email, status, created_at
-                FROM customers
+                SELECT id, name, date_of_birth, status, created_at
+                FROM patients
                 WHERE status = ?
                 LIMIT ?
                 """,
@@ -72,8 +72,8 @@ def list_customers(status: Optional[str] = None, limit: int = 20) -> List[Dict[s
         else:
             rows = db.execute(
                 """
-                SELECT id, name, email, status, created_at
-                FROM customers
+                SELECT id, name, date_of_birth, status, created_at
+                FROM patients
                 LIMIT ?
                 """,
                 (limit,),
@@ -82,76 +82,76 @@ def list_customers(status: Optional[str] = None, limit: int = 20) -> List[Dict[s
         return [dict(r) for r in rows]
 
 
-def modify_customer(customer_id: int, changes: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def modify_patient(patient_id: int, changes: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
-    Update permitted customer fields. Returns updated record or None if missing.
+    Update permitted patient fields. Returns updated record or None if missing.
     """
-    allowed = {"name", "email", "status"}
+    allowed = {"name", "date_of_birth", "status"}
     updates = {k: v for k, v in changes.items() if k in allowed}
 
     # nothing to update → return original
     if not updates:
-        return get_customer(customer_id)
+        return get_patient(patient_id)
 
     with _open_db() as db:
         exists = db.execute(
-            "SELECT 1 FROM customers WHERE id = ?", (customer_id,)
+            "SELECT 1 FROM patients WHERE id = ?", (patient_id,)
         ).fetchone()
         if not exists:
             return None
 
         assignments = ", ".join([f"{col} = ?" for col in updates])
-        values = list(updates.values()) + [customer_id]
+        values = list(updates.values()) + [patient_id]
 
         db.execute(
-            f"UPDATE customers SET {assignments} WHERE id = ?",
+            f"UPDATE patients SET {assignments} WHERE id = ?",
             values,
         )
         db.commit()
 
-    return get_customer(customer_id)
+    return get_patient(patient_id)
 
 
-def new_ticket(customer_id: int, issue: str, priority: str) -> Dict[str, Any]:
+def new_case(patient_id: int, complaint: str, urgency: str) -> Dict[str, Any]:
     """
-    Insert a new support ticket and return the full ticket entry.
+    Insert a new triage case and return the full case entry.
     """
     with _open_db() as db:
         cur = db.execute(
             """
-            INSERT INTO tickets (customer_id, issue, priority, status)
+            INSERT INTO cases (patient_id, complaint, urgency, status)
             VALUES (?, ?, ?, 'open')
             """,
-            (customer_id, issue, priority),
+            (patient_id, complaint, urgency),
         )
-        ticket_id = cur.lastrowid
+        case_id = cur.lastrowid
         db.commit()
 
         row = db.execute(
             """
-            SELECT id, customer_id, issue, priority, status, created_at
-            FROM tickets
+            SELECT id, patient_id, complaint, urgency, status, created_at
+            FROM cases
             WHERE id = ?
             """,
-            (ticket_id,),
+            (case_id,),
         ).fetchone()
 
         return dict(row)
 
 
-def customer_history(customer_id: int) -> List[Dict[str, Any]]:
+def patient_history(patient_id: int) -> List[Dict[str, Any]]:
     """
-    Retrieve interaction records for a customer, newest first.
+    Retrieve encounter records for a patient, newest first.
     """
     with _open_db() as db:
         rows = db.execute(
             """
             SELECT id, channel, notes, created_at
-            FROM interactions
-            WHERE customer_id = ?
+            FROM encounters
+            WHERE patient_id = ?
             ORDER BY created_at DESC
             """,
-            (customer_id,),
+            (patient_id,),
         ).fetchall()
 
         return [dict(r) for r in rows]
@@ -161,24 +161,24 @@ def customer_history(customer_id: int) -> List[Dict[str, Any]]:
 #  Backwards-compatible aliases for legacy imports
 # -----------------------------------------------------------------------------
 
-def fetch_customer(customer_id: int) -> Optional[Dict[str, Any]]:
-    return get_customer(customer_id)
+def fetch_patient(patient_id: int) -> Optional[Dict[str, Any]]:
+    return get_patient(patient_id)
 
 
-def fetch_customers(status: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
-    return list_customers(status=status, limit=limit)
+def fetch_patients(status: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
+    return list_patients(status=status, limit=limit)
 
 
-def update_customer_record(customer_id: int, changes: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    return modify_customer(customer_id, changes)
+def update_patient_record(patient_id: int, changes: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    return modify_patient(patient_id, changes)
 
 
-def create_ticket_record(customer_id: int, issue: str, priority: str) -> Dict[str, Any]:
-    return new_ticket(customer_id, issue, priority)
+def create_case_record(patient_id: int, complaint: str, urgency: str) -> Dict[str, Any]:
+    return new_case(patient_id, complaint, urgency)
 
 
-def fetch_history(customer_id: int) -> List[Dict[str, Any]]:
-    return customer_history(customer_id)
+def fetch_history(patient_id: int) -> List[Dict[str, Any]]:
+    return patient_history(patient_id)
 
 
 # -----------------------------------------------------------------------------
@@ -187,14 +187,14 @@ def fetch_history(customer_id: int) -> List[Dict[str, Any]]:
 
 __all__ = [
     "DB_PATH",
-    "get_customer",
-    "list_customers",
-    "modify_customer",
-    "new_ticket",
-    "customer_history",
-    "fetch_customer",
-    "fetch_customers",
-    "update_customer_record",
-    "create_ticket_record",
+    "get_patient",
+    "list_patients",
+    "modify_patient",
+    "new_case",
+    "patient_history",
+    "fetch_patient",
+    "fetch_patients",
+    "update_patient_record",
+    "create_case_record",
     "fetch_history",
 ]

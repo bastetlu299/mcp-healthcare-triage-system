@@ -1,9 +1,9 @@
 """
-Support Agent
--------------
-Provides empathetic, user-facing support responses. If the message includes
+Triage Agent
+------------
+Provides compassionate, user-facing triage guidance. If the message includes
 data context forwarded by the router (e.g., “Data context: ...”), the agent
-incorporates it into a more informed guidance message.
+incorporates it into a more informed response.
 """
 
 from __future__ import annotations
@@ -25,9 +25,9 @@ from shared.message_utils import build_text_message
 # Internal helper functions
 # ---------------------------------------------------------------------------
 
-def parse_support_prompt(text: str) -> tuple[str, str]:
+def parse_triage_prompt(text: str) -> tuple[str, str]:
     """
-    Extract optional upstream "data context" and the actual customer request.
+    Extract optional upstream "data context" and the actual patient request.
     Router sends messages formatted like:
         "Data context: ... Now craft guidance..."
     Returns:
@@ -51,20 +51,23 @@ def generate_suggestions(user_prompt: str) -> list[str]:
     lower = user_prompt.lower()
     out: list[str] = []
 
-    if any(k in lower for k in ["login", "password"]):
-        out.append("Try resetting your password and confirm you can sign in from a trusted browser.")
-        out.append("If it still fails, share the exact error message so we can diagnose quickly.")
-    elif any(k in lower for k in ["ticket", "issue", "problem"]):
-        out.append("I can open a support ticket and notify you as soon as there's progress.")
-        out.append("Screenshots or timestamps would help us troubleshoot faster.")
+    if any(k in lower for k in ["chest pain", "shortness of breath", "fainting"]):
+        out.append("If symptoms are severe or worsening, call emergency services immediately.")
+        out.append("Do not drive yourself; ask someone to help or call for transport.")
+    elif any(k in lower for k in ["fever", "cough", "sore throat"]):
+        out.append("Track your temperature, stay hydrated, and rest.")
+        out.append("If fever persists beyond 48 hours or you have breathing issues, seek urgent care.")
+    elif any(k in lower for k in ["medication", "refill", "prescription"]):
+        out.append("I can log a refill request and confirm the pharmacy details.")
+        out.append("Please share the medication name, dose, and preferred pharmacy.")
     elif any(k in lower for k in ["history", "follow", "activity"]):
-        out.append("I've reviewed your recent activity and will keep an eye on any new updates.")
-        out.append("If something changes on your side, let me know and we can adjust next steps.")
+        out.append("I reviewed your recent encounters and will flag any changes for the clinician.")
+        out.append("Let me know if your symptoms changed since the last check-in.")
     else:
-        out.append("Tell me any specific details you'd like us to verify or double-check.")
-        out.append("We can also set up a short follow-up if you need more help.")
+        out.append("Share your symptoms, when they started, and any current medications.")
+        out.append("We can arrange a follow-up or connect you to a clinician if needed.")
 
-    out.append("If this is urgent, reply here and I’ll jump on it immediately.")
+    out.append("If this is urgent, reply here and I’ll prioritize your case.")
     return out
 
 
@@ -72,28 +75,28 @@ def generate_suggestions(user_prompt: str) -> list[str]:
 # Skill implementation
 # ---------------------------------------------------------------------------
 
-async def support_skill(message: Message) -> Message:
+async def triage_skill(message: Message) -> Message:
     """
-    Generate a friendly, end-user-facing support reply.
+    Generate a friendly, end-user-facing triage reply.
     This agent should never reveal internal routing or JSON structures.
     """
     text = message.parts[0].text if (message.parts and message.parts[0].text) else ""
-    context_text, request_text = parse_support_prompt(text)
+    context_text, request_text = parse_triage_prompt(text)
 
     # Greeting
     if context_text:
-        opening = "Hi there — I reviewed the latest notes on your account."
+        opening = "Hi there — I reviewed the latest notes in your chart."
     else:
         opening = "Hi there, thanks for reaching out."
 
     # Small contextual line
     prompt_lower = text.lower()
-    if "login" in prompt_lower:
-        context_line = "It looks like you're having trouble signing in."
-    elif any(k in prompt_lower for k in ["ticket", "issue", "problem"]):
-        context_line = "I can see you’re dealing with an issue that needs attention."
+    if any(k in prompt_lower for k in ["chest pain", "shortness of breath"]):
+        context_line = "Chest symptoms can be serious, so I want to make sure you're safe."
+    elif any(k in prompt_lower for k in ["fever", "cough", "sore throat"]):
+        context_line = "Respiratory symptoms can vary, so I’ll ask a few key questions."
     elif context_text:
-        context_line = "I’ve read through the account history you mentioned."
+        context_line = "I’ve reviewed the recent encounter notes you mentioned."
     else:
         context_line = ""
 
@@ -112,7 +115,7 @@ async def support_skill(message: Message) -> Message:
         response_lines.append(f"- {s}")
 
     response_lines.append(
-        "If you'd like me to take action now, just reply to this message and I’ll handle it."
+        "If you'd like me to take action now, just reply to this message and I’ll coordinate next steps."
     )
 
     final_text = "\n".join(line for line in response_lines if line)
@@ -125,11 +128,11 @@ async def support_skill(message: Message) -> Message:
 
 def create_agent_card() -> AgentCard:
     return AgentCard(
-        name="Support Agent",
-        description="Provides troubleshooting help and customer-friendly guidance.",
+        name="Triage Agent",
+        description="Provides triage guidance and patient-friendly next steps.",
         url="http://localhost:8012",
         version="1.0.0",
-        documentationUrl="https://example.com/docs/support",
+        documentationUrl="https://example.com/docs/triage",
         defaultInputModes=["text"],
         defaultOutputModes=["text"],
         capabilities=AgentCapabilities(streaming=True),
@@ -139,16 +142,16 @@ def create_agent_card() -> AgentCard:
         ),
         skills=[
             AgentSkill(
-                id="support-general",
-                name="General Support",
-                description="Handles everyday support inquiries and troubleshooting questions.",
-                tags=["support", "triage", "helpdesk"],
+                id="triage-general",
+                name="Triage Guidance",
+                description="Handles intake questions and triage guidance for patient symptoms.",
+                tags=["triage", "intake", "healthcare"],
                 inputModes=["text"],
                 outputModes=["text"],
                 examples=[
-                    "Help me reset my password",
-                    "I need to troubleshoot an issue",
-                    "Review my recent activity",
+                    "I have a fever and cough",
+                    "My chest feels tight after exercise",
+                    "Review my recent symptoms",
                 ],
             )
         ],
@@ -161,10 +164,10 @@ def create_agent_card() -> AgentCard:
 # ---------------------------------------------------------------------------
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Support Agent Service")
+    app = FastAPI(title="Triage Agent Service")
     handler = SimpleAgentRequestHandler(
-        agent_id="support",
-        skill_callback=support_skill,
+        agent_id="triage",
+        skill_callback=triage_skill,
     )
     register_agent_routes(app, create_agent_card(), handler)
     return app
